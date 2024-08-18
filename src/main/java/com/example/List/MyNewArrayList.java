@@ -1,49 +1,82 @@
 package com.example.List;
 
-import java.io.Serializable;
+import com.example.List.stringNameUtil.StringName;
+
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Objects;
 
-// добавить метод проверки что переданный индекс больше 0 и меньше размера листа. добавить метод увеличения листа, когда переходит нужный размер
-public class MyNewArrayMyNewList<T> implements MyNewList<T>, Serializable {
-    private static final String THE_SIZE_CANNOT_BE_LESS_THAN_ZERO = "Размер не может быть меньше нуля";
-    private static final String THE_INDEX_IS_OUT_OF_RANGE = "Индекс выходит за рамки допустимого диапазона";
+/**
+ * Реализует интерфейс {@code MyNewList} с расширяющимся массивом. Массив расширяется, когда заканчиваются ячейки для вставки элементов.
+ * Класс параметризирован.
+ * Доступные методы для использования: добавления элемента в конце списка или по индексу,
+ * удаления элемента по индексу или по элементу, удаление всех элементов, замена элемента по индексу, получение элемента по индексу,
+ * получение количества добавленных элементов, получения нового списка у которого будет только часть элементов изначального списка
+ * от указанного и до указанного индекса.
+ * @param <T> тип элементов
+ * @author Anton Nechunaev
+ * @version 1.0
+ * @see MyNewList
+ * @see MyNewArrayList содержит воспомогательные методы необходимые всем наследникам
+ */
+public class MyNewArrayList<T> extends MyNewAbstractList<T> implements MyNewList<T> {
+
+    /**
+     * Счётчик имеющихся в списке элементов.
+     */
     private int size = 0;
-    //добавить параметр ай ди версии
+    /**
+     * Размер внутреннего массива по умолчанию.
+     */
     private static final int DEFAULT_SIZE = 10;
+    /**
+     * Внутренний массив, в котором хранятся все элементы. Он расширяется при добавлении элемента, когда массив уже заполнен полностью.
+     */
     private Object[] array;
 
-    public MyNewArrayMyNewList() {
+    /**
+     * Конструктор без параметров создаёт внутренний массив размером 10.
+     */
+    public MyNewArrayList() {
         this.array = new Object[DEFAULT_SIZE];
     }
 
-    public MyNewArrayMyNewList(Collection<T> collection) {
+    /**
+     * Конструктор создаёт список, который будет содержать элементы переданной коллекции.
+     * @param collection коллекция, элементы которой нужно добавить в список
+     * @throws NullPointerException если передать null в качестве параметра
+     */
+    public MyNewArrayList(Collection<T> collection) {
         int sizeCollection = collection.size();
         this.array = collection.toArray();
         size = sizeCollection;
     }
 
-    public MyNewArrayMyNewList(int size) {
+    /**
+     * Конструктор создаёт пустой список нужного размера.
+     * @param size размер списка
+     * @throws IllegalArgumentException если передать меньше нуля
+     */
+    public MyNewArrayList(int size) {
         if (size >= 0) {
             array = new Object[size];
         } else {
-            throw new IllegalArgumentException(THE_SIZE_CANNOT_BE_LESS_THAN_ZERO);
+            throw new IllegalArgumentException(StringName.THE_SIZE_CANNOT_BE_LESS_THAN_ZERO);
         }
 
     }
 
     @Override
-    public boolean add(Object o) {
+    public boolean add(T element) {
         checkingAndEnlargingTheArrayIfItIsFull();
-        array[size] = o;
+        array[size] = element;
         size++;
         return true;
     }
 
-
     @Override
-    public boolean add(Object element, int index) {
-        rangeCheck(index);
+    public boolean add(T element, int index) {
+        rangeCheck(index, size);
         checkingAndEnlargingTheArrayIfItIsFull();
         if (array[index] == null) {
             array[index] = element;
@@ -59,19 +92,20 @@ public class MyNewArrayMyNewList<T> implements MyNewList<T>, Serializable {
         return false;
     }
 
-    // остальные элементы должны сместится
     @Override
     public boolean remove(int index) {
-        rangeCheck(index);
-        int range = size - index;
-        for (int i = 0; i < range; i++) {
-            array[index + i] = array[index + i + 1];
-        }
+        rangeCheck(index, size);
         size--;
+        if (index == size) {
+            array[size] = null;
+        } else {
+            System.arraycopy(array, index + 1, array, index, size - index);
+        }
         return true;
     }
 
-    public boolean remove(Object element) {
+    @Override
+    public boolean remove(T element) {
         for (int i = 0; i < size; i++) {
             if (element.equals(array[i])) {
                 remove(i);
@@ -81,70 +115,67 @@ public class MyNewArrayMyNewList<T> implements MyNewList<T>, Serializable {
         return false;
     }
 
-    @Override
-    public Object get(int index) {
-        return array[index];
+    /**
+     * Удаляет все элементы из списка. Счётчик элементов обнуляется. Размер внутреннего массива остаётся, такой же какой был.
+     */
+    public void removeAll() {
+        array = new Object[array.length];
+        size = 0;
     }
 
-    // сет должен выбрасывать исключение ArrayOutOfBoundIndex если нечего менять
     @Override
-    public void set(int index, Object o) {
-        rangeCheck(index);
-
-        array[index] = o;
+    public T get(int index) {
+        return (T) array[index];
     }
+
+    @Override
+    public void set(int index, T element) {
+        rangeCheck(index, size);
+        array[index] = element;
+    }
+
 
     @Override
     public int size() {
-        int countElement = 0;
-        for (int i = 0; i < array.length; i++) {
-            if (array[i] != null) {
-                countElement++;
-            }
-        }
-        return countElement;
+        return size;
     }
 
     @Override
     public MyNewList subList(int fromIndex, int toIndex) {
         int sizeSubList = toIndex - fromIndex;
-        MyNewList<Object> subList = new MyNewArrayMyNewList<>(sizeSubList);
+        MyNewList<Object> subList = new MyNewArrayList<>(sizeSubList);
         for (int i = 0; i < sizeSubList; i++) {
             subList.add(array[fromIndex + i]);
         }
         return subList;
     }
 
-    private void rangeCheck(int index) {
-        if (array.length < index || 0 > index) {
-            throw new IllegalArgumentException(THE_INDEX_IS_OUT_OF_RANGE);
-        }
-    }
-
-    //увеличение массива
+    /**
+     * Метод для увеличения внутреннего массива, когда все ячейки заняты.
+     * Используется перед добавлением новых элементов в методах add.
+     */
     private void increasingTheArray() {
         int sizeArray = array.length;
         int newSizeArray = sizeArray + (int) (sizeArray * 0.5) + 1;
-//        Object[] newArray = new Object[newSizeArray];
-//        for (int i = 0; i < sizeArray; i++) {
-//            newArray[i] = array[i];
-//        }
-//        array = newArray;
         array = Arrays.copyOf(array, newSizeArray);
-//        System.out.println("Отработал метод increasingTheArray");
     }
 
-    //проверка полный ли массив
+    /**
+     * Метод проверяет все ли ячейки массива заполнены.
+     * @return true если все ячейки заполнены.
+     * @return false если последняя ячейка ещё не заполнена.
+     */
     private boolean isArrayFull() {
         int lastElement = array.length - 1;
         if (array[lastElement] == null) {
-//            System.out.println("Отработал метод isArrayFull результат false");
             return false;
         }
-//        System.out.println("Отработал метод isArrayFull результат true");
         return true;
     }
 
+    /**
+     * Метод объединяющий проверки: заполнены ли все ячейки внутреннего массива и увеличивающий размер массива, если пустых ячеек не осталось.
+     */
     private void checkingAndEnlargingTheArrayIfItIsFull() {
         if (isArrayFull()) {
             increasingTheArray();
@@ -152,15 +183,19 @@ public class MyNewArrayMyNewList<T> implements MyNewList<T>, Serializable {
     }
 
 
-    // метод отчищает индекс для вставки
+    /**
+     * Метод. Освобождает ячейку перед добавлением нового элемента в уже занятую ячейку.
+     * Все элементы начиная с элемента по переданному индексу смещаются на 1 ячейку вправо.
+     * @param index индекс ячейки, которую нужно освободить
+     */
     private void freeingTheIndexCell(int index) {
-        Object[] subArray = new Object[array.length];
-        for (int i = 0; i < index; i++) {
-            subArray[i] = array[i];
-        }
-        for (int i = index + 1; i < array.length; i++) {
-            subArray[i] = array[i - 1];
-        }
-        array = subArray;
+        System.arraycopy(array, index, array, index + 1, size - index);
+    }
+
+    @Override
+    public String toString() {
+        Object[] newArray = Arrays.stream(array).filter(Objects::nonNull).toArray(Object[]::new);
+        return "MyNewArrayList = " + Arrays.toString(newArray);
+
     }
 }
